@@ -24,11 +24,11 @@ data class ReleaseInfo(val title: String, val build: Int, val notes: String, val
 object UpdateChecker {
     const val REPO = "Schnielz87/Virenscanner"
     const val TAG = "neueste-version"
-    const val ASSET = "SVS-Security.apk"
+    const val ASSET = "Handywaechter.apk"
     val PAGE_URL = "https://github.com/$REPO/releases/tag/$TAG"
     val DIRECT_URL = "https://github.com/$REPO/releases/download/$TAG/$ASSET"
 
-    /** "SVS Security v1.0.42" / "1.0.42" -> 42 */
+    /** "Handywächter v1.0.42" / "1.0.42" -> 42 */
     fun buildOf(s: String?): Int? = s?.let { Regex("""(\d+)\.(\d+)\.(\d+)""").find(it) }?.groupValues?.get(3)?.toIntOrNull()
 
     fun currentVersion(ctx: Context): String =

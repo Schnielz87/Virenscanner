@@ -79,7 +79,7 @@ object RiskRules {
         "org.telegram.messenger" -> "über Telegram erhalten"
         "com.samsung.android.app.watchmanager" -> "über Galaxy Wearable installiert"
         "com.samsung.SMT" -> "über Samsung TTS installiert"
-        "de.svs.security" -> "SVS Security (Update)"
+        "de.svs.security" -> "Handywächter (Update)"
         else -> "über $installer installiert"
     }
 

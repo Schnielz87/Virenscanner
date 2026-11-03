@@ -10,7 +10,10 @@ import de.svs.security.intel.ThreatIntel
 import de.svs.security.monitor.Monitor
 import de.svs.security.report.ReportBuilder
 import de.svs.security.scan.ScanResult
+import de.svs.security.scan.ScanWorker
 import de.svs.security.scan.Scanner
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import de.svs.security.update.ReleaseInfo
 import de.svs.security.update.UpdateChecker
 import kotlinx.coroutines.Dispatchers
@@ -44,19 +47,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     init {
+        observeScan()
         viewModelScope.launch(Dispatchers.Default) { runCatching { Monitor.check(ctx) } }
         // Beim ersten Start sofort aktuelle Bedrohungsdaten holen
         if (ThreatIntel.status.value.lastUpdate == 0L && ctx.getSharedPreferences("intel", 0).getLong("last", 0L) == 0L) updateIntel()
     }
 
+    /** Vollpruefung im Hintergrund starten – laeuft auch bei minimierter/geschlossener App weiter. */
     fun startScan() {
-        if (scanProgress.value != null) return
+        scanProgress.value = scanProgress.value ?: ("Starte …" to 0f)
+        ScanWorker.start(ctx)
+    }
+
+    /** Fortschritt und Ergebnis des Hintergrund-Scans beobachten (auch nach erneutem Oeffnen der App). */
+    private fun observeScan() {
         viewModelScope.launch {
-            scanProgress.value = "Starte …" to 0f
-            if (ThreatIntel.db.domainCount == 0) ThreatIntel.load(ctx)
-            val r = runCatching { Scanner.run(ctx) { s, p -> scanProgress.value = s to p } }.getOrNull()
-            if (r != null) scan.value = r
-            scanProgress.value = null
+            WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow(ScanWorker.NAME).collect { infos ->
+                val w = infos.firstOrNull() ?: return@collect
+                when (w.state) {
+                    WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> {
+                        val t = w.progress.getString(ScanWorker.KEY_TEXT) ?: "Prüfung läuft …"
+                        scanProgress.value = t to w.progress.getFloat(ScanWorker.KEY_P, 0f)
+                    }
+                    WorkInfo.State.SUCCEEDED, WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                        scanProgress.value = null
+                        scan.value = withContext(Dispatchers.IO) { Scanner.last(ctx) }
+                    }
+                }
+            }
         }
     }
 
@@ -130,7 +148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val r = update.value ?: return
         if (!UpdateChecker.canInstall(ctx)) {
             UpdateChecker.openInstallPermission(ctx)
-            updateStatus.value = "Bitte „Unbekannte Apps installieren“ für SVS Security erlauben und erneut tippen"
+            updateStatus.value = "Bitte „Unbekannte Apps installieren“ für Handywächter erlauben und erneut tippen"
             return
         }
         viewModelScope.launch {

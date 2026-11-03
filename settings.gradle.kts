@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "SVS-Security"
+rootProject.name = "Handywaechter"
 include(":app")

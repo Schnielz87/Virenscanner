@@ -47,7 +47,7 @@ class WebShieldService : VpnService() {
         upstreams = buildUpstreams()
         val configure = PendingIntent.getActivity(this, 1, Intent(this, MainActivity::class.java).putExtra("tab", "protect"), PendingIntent.FLAG_IMMUTABLE)
         val b = Builder()
-            .setSession("SVS Web-Schutz")
+            .setSession("Handywächter Web-Schutz")
             .addAddress(TUN_ADDR, 32)
             .addDnsServer(DNS_ADDR)
             .addRoute(DNS_ADDR, 32)

@@ -56,10 +56,10 @@ fun HistoryScreen(vm: AppViewModel, modifier: Modifier) {
 
     LazyColumn(modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (!access) item {
-            SectionCard("Nutzungsdaten freigeben (wichtig)", Svs.Red) {
+            SectionCard("Nutzungsdaten freigeben (wichtig)", Brand.Red) {
                 Body("Damit die App rückwirkend zeigen kann, welche App wann geöffnet wurde, wann das Handy neu gestartet und entsperrt wurde, braucht sie den „Nutzungsdatenzugriff“. Android speichert diese Daten ca. 7–10 Tage – gestern Abend ist also noch sichtbar.")
                 Button(onClick = { Actions.usageAccess(ctx) }) { Text("Zugriff erlauben") }
-                Muted("In der Liste „SVS Security“ antippen und einschalten, dann zurückkehren.")
+                Muted("In der Liste „Handywächter“ antippen und einschalten, dann zurückkehren.")
             }
         }
         item {
@@ -76,7 +76,7 @@ fun HistoryScreen(vm: AppViewModel, modifier: Modifier) {
         }
         item { Summary(events) }
         grouped.forEach { (day, list) ->
-            item { Text(fmtDay(day), style = MaterialTheme.typography.titleSmall, color = Svs.Red, fontWeight = FontWeight.Bold) }
+            item { Text(fmtDay(day), style = MaterialTheme.typography.titleSmall, color = Brand.Primary, fontWeight = FontWeight.Bold) }
             items(list) { EventRow(it) }
         }
         if (!loading && shown.isEmpty()) item { Muted("Keine Einträge im gewählten Zeitraum.") }
@@ -110,9 +110,9 @@ private fun Summary(ev: List<LogEvent>) {
 private fun EventRow(e: LogEvent) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.Top) {
-            Text(fmtTime(e.time), style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(72.dp), color = if (e.alert) Svs.Red else Svs.Grey)
+            Text(fmtTime(e.time), style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(72.dp), color = if (e.alert) Brand.Red else Brand.Grey)
             Column(Modifier.weight(1f)) {
-                Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (e.alert) FontWeight.Bold else FontWeight.Normal, color = if (e.alert) Svs.Red else MaterialTheme.colorScheme.onSurface)
+                Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (e.alert) FontWeight.Bold else FontWeight.Normal, color = if (e.alert) Brand.Red else MaterialTheme.colorScheme.onSurface)
                 if (e.detail.isNotEmpty()) Muted(e.detail)
                 e.pkg?.let { Muted(it) }
             }

@@ -68,7 +68,7 @@ class DailyWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p) {
         }
         runCatching {
             val rel = UpdateChecker.latest()
-            if (rel.build > UpdateChecker.currentBuild(ctx)) Notifier.info(ctx, "Neue Version von SVS Security", "${rel.title} – in der App unter „Mehr → Update“ installieren.")
+            if (rel.build > UpdateChecker.currentBuild(ctx)) Notifier.info(ctx, "Neue Version von Handywächter", "${rel.title} – in der App unter „Hilfe → Update“ installieren.")
         }
         return Result.success()
     }

@@ -6,7 +6,7 @@ import java.net.URL
 
 /** Minimaler HTTPS-Client (ohne Zusatzbibliothek), folgt Weiterleitungen. */
 object Http {
-    private const val UA = "SVS-Security-Android"
+    private const val UA = "Handywaechter-Android"
 
     fun get(url: String, accept: String? = null, maxBytes: Long = 30L * 1024 * 1024): ByteArray {
         var current = url

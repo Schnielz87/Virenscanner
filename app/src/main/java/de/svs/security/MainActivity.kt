@@ -36,8 +36,8 @@ import de.svs.security.ui.HistoryScreen
 import de.svs.security.ui.ProtectScreen
 import de.svs.security.ui.ReportDialog
 import de.svs.security.ui.ScanScreen
-import de.svs.security.ui.Svs
-import de.svs.security.ui.SvsTheme
+import de.svs.security.ui.Brand
+import de.svs.security.ui.AppTheme
 import de.svs.security.vpn.WebShieldService
 
 enum class Tab(val key: String, val label: String, val icon: ImageVector) {
@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handle(intent)
         if (Build.VERSION.SDK_INT >= 33) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
-        setContent { SvsTheme { Root() } }
+        setContent { AppTheme { Root() } }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -100,8 +100,8 @@ class MainActivity : ComponentActivity() {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("SVS Security · ${tab.value.label}") },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Svs.Red, titleContentColor = Color.White),
+                    title = { Text("Handywächter · ${tab.value.label}") },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Brand.Primary, titleContentColor = Color.White),
                 )
             },
             bottomBar = {

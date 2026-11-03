@@ -59,7 +59,7 @@ object Actions {
     fun call(ctx: Context, number: String) = open(ctx, Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")))
 
     fun copy(ctx: Context, text: String) {
-        (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("SVS Security", text))
+        (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Handywächter", text))
     }
 
     /** Erstes Intent, das funktioniert. */

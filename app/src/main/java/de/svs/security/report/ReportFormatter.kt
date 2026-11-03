@@ -34,12 +34,12 @@ object ReportFormatter {
     private const val LINE = "════════════════════════════════════════"
 
     fun format(r: ReportData): String = buildString {
-        appendLine("SVS SECURITY – GESAMTÜBERSICHT")
+        appendLine("HANDYWÄCHTER – GESAMTÜBERSICHT")
         appendLine(LINE)
         appendLine("Erstellt:          ${t(r.created)}")
         appendLine("Gerät:             ${r.device}")
         appendLine("Android:           ${r.android} · Sicherheitspatch ${r.securityPatch}")
-        appendLine("SVS Security:      ${r.appVersion}")
+        appendLine("Handywächter:      ${r.appVersion}")
         appendLine()
 
         // 1. Gesamtbewertung
@@ -175,5 +175,5 @@ object ReportFormatter {
     private fun appLine(a: AppInfo) =
         "${a.label} (${a.pkg}) – ${if (a.system) "Systemapp" else RiskRules.installerLabel(a.installer)}"
 
-    fun fileName(created: Long) = "SVS-Security-Bericht_" + SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.GERMANY).format(Date(created)) + ".txt"
+    fun fileName(created: Long) = "Handywaechter-Bericht_" + SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.GERMANY).format(Date(created)) + ".txt"
 }

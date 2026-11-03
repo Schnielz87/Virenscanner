@@ -40,7 +40,7 @@ fun ReportDialog(vm: AppViewModel, save: () -> Unit) {
     Dialog(onDismissRequest = { vm.closeReport() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Gesamtübersicht", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Svs.Red)
+                Text("Gesamtübersicht", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Brand.Primary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         Actions.copy(ctx, report)
@@ -49,7 +49,7 @@ fun ReportDialog(vm: AppViewModel, save: () -> Unit) {
                     OutlinedButton(onClick = {
                         ctx.startActivity(Intent.createChooser(
                             Intent(Intent.ACTION_SEND).setType("text/plain")
-                                .putExtra(Intent.EXTRA_SUBJECT, "SVS Security – Gesamtübersicht")
+                                .putExtra(Intent.EXTRA_SUBJECT, "Handywächter – Gesamtübersicht")
                                 .putExtra(Intent.EXTRA_TEXT, report), "Bericht teilen"))
                     }) { Text("Teilen") }
                     OutlinedButton(onClick = save) { Text("Speichern") }

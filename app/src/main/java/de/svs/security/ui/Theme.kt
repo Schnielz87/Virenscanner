@@ -8,9 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import de.svs.security.scan.Severity
 
-object Svs {
+object Brand {
+    /** Hauptfarbe (Sicherheits-Blau) */
+    val Primary = Color(0xFF0D47A1)
+    val PrimaryDark = Color(0xFF0A3A82)
+    /** Warnfarbe */
     val Red = Color(0xFFD0312D)
-    val RedDark = Color(0xFFA5231F)
     val Green = Color(0xFF2E7D32)
     val Amber = Color(0xFFE08A00)
     val Blue = Color(0xFF1565C0)
@@ -26,11 +29,11 @@ object Svs {
 }
 
 @Composable
-fun SvsTheme(content: @Composable () -> Unit) {
+fun AppTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     MaterialTheme(
-        colorScheme = if (dark) darkColorScheme(primary = Color(0xFFFF6B66), secondary = Color(0xFFFF8A80))
-        else lightColorScheme(primary = Svs.Red, secondary = Svs.RedDark, primaryContainer = Color(0xFFFBE9E8)),
+        colorScheme = if (dark) darkColorScheme(primary = Color(0xFF82B1FF), secondary = Color(0xFF90CAF9))
+        else lightColorScheme(primary = Brand.Primary, secondary = Brand.PrimaryDark, primaryContainer = Color(0xFFE3F2FD)),
         content = content,
     )
 }

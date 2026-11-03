@@ -53,10 +53,10 @@ fun ScanScreen(vm: AppViewModel, modifier: Modifier, goTo: (Tab) -> Unit) {
         item {
             val worst = result?.worst
             val (icon, color, headline) = when {
-                result == null -> Triple(Icons.Filled.GppMaybe, Svs.Grey, "Noch nicht geprüft")
-                worst == null || worst == Severity.LOW -> Triple(Icons.Filled.CheckCircle, Svs.Green, "Keine verdächtigen Apps gefunden")
-                worst == Severity.MEDIUM -> Triple(Icons.Filled.Warning, Svs.Amber, "Einige Punkte prüfen")
-                else -> Triple(Icons.Filled.Warning, Svs.Red, "Handlungsbedarf")
+                result == null -> Triple(Icons.Filled.GppMaybe, Brand.Grey, "Noch nicht geprüft")
+                worst == null || worst == Severity.LOW -> Triple(Icons.Filled.CheckCircle, Brand.Green, "Keine verdächtigen Apps gefunden")
+                worst == Severity.MEDIUM -> Triple(Icons.Filled.Warning, Brand.Amber, "Einige Punkte prüfen")
+                else -> Triple(Icons.Filled.Warning, Brand.Red, "Handlungsbedarf")
             }
             SectionCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -75,6 +75,7 @@ fun ScanScreen(vm: AppViewModel, modifier: Modifier, goTo: (Tab) -> Unit) {
                 if (p != null) {
                     LinearProgressIndicator(progress = { p.second }, modifier = Modifier.fillMaxWidth())
                     Muted(p.first)
+                    Muted("Läuft im Hintergrund weiter – du kannst die App minimieren. Fortschritt siehst du auch in der Benachrichtigung.")
                 } else {
                     Button(onClick = { vm.startScan() }, modifier = Modifier.fillMaxWidth()) { Text("Jetzt vollständig prüfen") }
                 }
@@ -92,7 +93,7 @@ fun ScanScreen(vm: AppViewModel, modifier: Modifier, goTo: (Tab) -> Unit) {
         }
 
         item {
-            SectionCard("Sperr-Meldung „Innenministerium / Cyberkriminalität“?", Svs.Amber) {
+            SectionCard("Sperr-Meldung „Innenministerium / Cyberkriminalität“?", Brand.Amber) {
                 Body("Das war eine Betrugsseite im Browser („Polizei-Trojaner“-Masche), kein echter Zugriff auf dein Handy. Nicht bezahlen. Was zu tun ist und warum die Widgets weg sein können, steht unter „Hilfe“.")
                 OutlinedButton(onClick = { goTo(Tab.HELP) }) { Text("Zur Erklärung") }
                 OutlinedButton(onClick = { goTo(Tab.HISTORY) }) { Text("Verlauf von gestern ansehen") }
@@ -103,7 +104,7 @@ fun ScanScreen(vm: AppViewModel, modifier: Modifier, goTo: (Tab) -> Unit) {
             val important = r.findings.filter { it.severity <= Severity.MEDIUM }
             val low = r.findings.filter { it.severity > Severity.MEDIUM }
             if (important.isEmpty()) item {
-                SectionCard("Keine kritischen Befunde", Svs.Green) {
+                SectionCard("Keine kritischen Befunde", Brand.Green) {
                     Body("Keine Übereinstimmung mit bekannten Spionage-Apps und keine App mit verdächtiger Kombination aus Herkunft und Sonderrechten. Systemkomponenten ohne App-Symbol (z. B. Sprachpakete, Buds-Plugins) werden nicht als Risiko gewertet.")
                 }
             }
@@ -123,7 +124,7 @@ fun FindingCard(f: Finding) {
     SectionCard {
         Column(Modifier.clickable { open = !open }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Pill(f.levelText, Svs.color(f.severity))
+                Pill(f.levelText, Brand.color(f.severity))
                 Spacer(Modifier.width(8.dp))
                 Text(f.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
@@ -134,11 +135,11 @@ fun FindingCard(f: Finding) {
                 }
                 if (f.factors.isNotEmpty()) {
                     Text("Score erhöht durch:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    f.factors.forEach { Text("  $it", style = MaterialTheme.typography.bodySmall, color = Svs.color(f.severity)) }
+                    f.factors.forEach { Text("  $it", style = MaterialTheme.typography.bodySmall, color = Brand.color(f.severity)) }
                 }
                 if (f.neutral.isNotEmpty()) {
                     Text("Als unkritisch eingestuft:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    f.neutral.forEach { Text("  ✓ $it", style = MaterialTheme.typography.bodySmall, color = Svs.Green) }
+                    f.neutral.forEach { Text("  ✓ $it", style = MaterialTheme.typography.bodySmall, color = Brand.Green) }
                 }
                 Text("Empfehlung: ${f.advice}", style = MaterialTheme.typography.bodySmall)
             }
@@ -146,7 +147,7 @@ fun FindingCard(f: Finding) {
         if (open && f.action != FixAction.NONE) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = { Actions.run(ctx, f.action, f.pkg) },
-                colors = if (f.action == FixAction.UNINSTALL) ButtonDefaults.buttonColors(containerColor = Svs.Red) else ButtonDefaults.buttonColors(),
+                colors = if (f.action == FixAction.UNINSTALL) ButtonDefaults.buttonColors(containerColor = Brand.Red) else ButtonDefaults.buttonColors(),
             ) {
                 Text(
                     when (f.action) {

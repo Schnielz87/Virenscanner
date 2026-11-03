@@ -85,7 +85,7 @@ object ReportBuilder {
             "USB-Debugging" to yn(runCatching { Settings.Global.getInt(cr, Settings.Global.ADB_ENABLED, 0) == 1 }.getOrDefault(false)),
             "Entwickleroptionen" to yn(runCatching { Settings.Global.getInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1 }.getOrDefault(false)),
             "Startbildschirm-App" to (AppInventory.defaultHome(ctx) ?: "?"),
-            "Web-Schutz (SVS)" to if (WebShieldService.isEnabled(ctx)) "an (${WebShieldService.blockedCount(ctx)} blockiert)" else "aus",
+            "Web-Schutz (Handywächter)" to if (WebShieldService.isEnabled(ctx)) "an (${WebShieldService.blockedCount(ctx)} blockiert)" else "aus",
             "VPN aktiv" to yn(vpn),
             "Privates DNS" to privateDns,
             "Nutzungsdatenzugriff (Verlauf)" to if (Timeline.hasUsageAccess(ctx)) "erlaubt" else "NICHT erlaubt – Verlauf unvollständig",

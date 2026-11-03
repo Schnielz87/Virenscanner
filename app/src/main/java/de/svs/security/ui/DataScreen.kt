@@ -72,7 +72,7 @@ fun DataScreen(vm: AppViewModel, modifier: Modifier) {
         items(news.take(80)) { n ->
             SectionCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Pill(n.severity.ifEmpty { "info" }, when (n.severity.lowercase()) { "kritisch" -> Svs.Red; "hoch" -> Svs.Amber; else -> Svs.Blue })
+                    Pill(n.severity.ifEmpty { "info" }, when (n.severity.lowercase()) { "kritisch" -> Brand.Red; "hoch" -> Brand.Amber; else -> Brand.Blue })
                     Spacer(Modifier.width(8.dp))
                     Muted(n.pubDate.take(16))
                 }

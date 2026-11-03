@@ -27,7 +27,7 @@ fun HelpScreen(vm: AppViewModel, modifier: Modifier) {
 
     LazyColumn(modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionCard("Was war die Meldung „Innenministerium – Abteilung für Cyberkriminalität“?", Svs.Red) {
+            SectionCard("Was war die Meldung „Innenministerium – Abteilung für Cyberkriminalität“?", Brand.Red) {
                 Body("Eine bekannte Betrugsmasche („Polizei-“ bzw. „BKA-Trojaner“ für den Browser). Eine Webseite – meist über Werbung oder einen Tippfehler-Link geöffnet – zeigt per JavaScript immer wieder dieselbe Meldung an, sodass sich der Tab scheinbar nicht schließen lässt.")
                 Body("• Behörden sperren keine Handys und fordern nie Geld per Sofortüberweisung auf ein Privatkonto (hier „Andrzej Stawski“).")
                 Body("• Die Seite hatte KEINEN Zugriff auf dein Handy, deine Dateien oder Fotos. Sie lief nur im Browser.")
@@ -36,7 +36,7 @@ fun HelpScreen(vm: AppViewModel, modifier: Modifier) {
             }
         }
         item {
-            SectionCard("Was jetzt tun?", Svs.Amber) {
+            SectionCard("Was jetzt tun?", Brand.Amber) {
                 Body("1. In dieser App „Prüfen“ → „Jetzt vollständig prüfen“. Kritische oder hohe Befunde zuerst beheben.")
                 Body("2. Unter „Verlauf“ den Nutzungsdatenzugriff erlauben und „Seit gestern“ ansehen: Neustarts, abgesicherter Modus, geöffnete Einstellungen und Installationen werden dort angezeigt.")
                 Body("3. Web-Schutz unter „Schutz“ einschalten.")
@@ -46,7 +46,7 @@ fun HelpScreen(vm: AppViewModel, modifier: Modifier) {
             }
         }
         item {
-            SectionCard("Warum sind Kalender-, Wetter-, Notiz- und Edelmetall-Widgets weg?", Svs.Blue) {
+            SectionCard("Warum sind Kalender-, Wetter-, Notiz- und Edelmetall-Widgets weg?", Brand.Blue) {
                 Body("Das Löschen von Cache/Daten des Browsers entfernt keine Widgets. Typische Ursachen, wenn mehrere Widgets gleichzeitig verschwinden:")
                 Body("• Abgesicherter Modus: Wer beim Neustart (z. B. um die Meldung loszuwerden) die Leiser-Taste hält, startet den abgesicherten Modus. Android entfernt dabei die Widgets aller nicht vorinstallierten Apps dauerhaft vom Startbildschirm. Erkennbar am Schriftzug „Abgesicherter Modus“ unten links.")
                 Body("• Falsche App zurückgesetzt: Wurden unter Einstellungen → Apps versehentlich die Daten von „One UI Home“ (Startbildschirm) statt von Samsung Internet gelöscht, setzt sich der Startbildschirm auf Werkszustand zurück – alle Widgets und die Anordnung sind weg.")

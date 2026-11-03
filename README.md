@@ -1,12 +1,12 @@
-# SVS Security – Sicherheits-App für Android
+# Handywächter – Sicherheits-App für Android
 
 Virenscanner, rückwirkender Verlauf, Web-Schutz und Warnungen für Samsung-/Android-Handys.
 Entstanden nach einer Browser-Sperrmeldung („Innenministerium – Abteilung für Cyberkriminalität“,
 Zahlung von 610 € gefordert) und danach verschwundenen Widgets.
 
 **Download (neueste Version):**
-[`SVS-Security.apk`](https://github.com/Schnielz87/Virenscanner/releases/download/neueste-version/SVS-Security.apk)
-(GitHub → Releases → „SVS Security v1.0.x“, ohne Anmeldung)
+[`Handywaechter.apk`](https://github.com/Schnielz87/Virenscanner/releases/download/neueste-version/Handywaechter.apk)
+(GitHub → Releases → „Handywächter v1.0.x“, ohne Anmeldung)
 
 ## Funktionen
 
@@ -55,12 +55,19 @@ Ein fehlendes App-Symbol zählt nur **3 Punkte** (bei Sprachpaketen, TTS-Stimmen
 Die App spricht nur bei Übereinstimmung mit Bedrohungsdaten von einer „bekannten Spionage-App“, sonst von
 „Verdächtige App“, „Erhöhtes Risiko“ oder „Manuelle Prüfung empfohlen“.
 
+### Prüfung im Hintergrund
+
+„Jetzt vollständig prüfen“ startet die Prüfung als Hintergrundauftrag (WorkManager, Vordergrunddienst mit
+Fortschritts-Benachrichtigung). Sie läuft weiter, wenn die App minimiert oder geschlossen wird; am Ende kommt
+eine Benachrichtigung mit dem Ergebnis.
+
 ## Update-Funktion
 
 Wie bei den anderen Apps: Jeder Push baut per GitHub Actions eine neue APK
 (`versionName 1.0.<Lauf-Nr. + 10>`) und ersetzt das Release `neueste-version`. Die App prüft täglich
 und unter *Hilfe → Update*, lädt die APK und öffnet den Android-Installer. Alle APKs sind mit
-`app/signing/sideload.jks` signiert → Update ohne Datenverlust.
+`app/signing/sideload.jks` signiert. Die interne Kennung `de.svs.security` bleibt bewusst unverändert –
+sonst wäre jede neue Version eine neue App und die bisherige ließe sich nicht aktualisieren → Update ohne Datenverlust.
 
 Das Repository ist öffentlich, daher funktionieren Update-Prüfung und Download ohne GitHub-Konto
 (Einstellung: `REPO`/`TAG` in [`UpdateChecker.kt`](app/src/main/java/de/svs/security/update/UpdateChecker.kt)).

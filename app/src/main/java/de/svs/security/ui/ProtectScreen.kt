@@ -49,7 +49,7 @@ fun ProtectScreen(vm: AppViewModel, modifier: Modifier, shared: String?, enableS
 
     LazyColumn(modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionCard("Web-Schutz (blockiert Betrugsseiten)", if (shieldOn) Svs.Green else Svs.Grey) {
+            SectionCard("Web-Schutz (blockiert Betrugsseiten)", if (shieldOn) Brand.Green else Brand.Grey) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Body(if (shieldOn) "Aktiv – gefährliche Seiten werden gesperrt" else "Aus")
@@ -62,28 +62,28 @@ fun ProtectScreen(vm: AppViewModel, modifier: Modifier, shared: String?, enableS
                 }
                 Muted("Prüft jede Webseiten-Adresse gegen die täglich aktualisierten Listen (Malware, Phishing, Spionage-Server). Technisch ein lokales VPN nur für Adressabfragen: dein Datenverkehr wird nicht mitgelesen und verlässt das Handy wie bisher. Das Schlüssel-Symbol oben in der Statusleiste ist normal.")
                 OutlinedButton(onClick = { Actions.vpnSettings(ctx) }) { Text("„Dauerhaft aktiv“ einstellen (empfohlen)") }
-                Muted("In den VPN-Einstellungen bei „SVS Web-Schutz“ auf ⚙ tippen und „Durchgehend aktives VPN“ einschalten – dann startet der Schutz auch nach einem Neustart.")
+                Muted("In den VPN-Einstellungen bei „Handywächter Web-Schutz“ auf ⚙ tippen und „Durchgehend aktives VPN“ einschalten – dann startet der Schutz auch nach einem Neustart.")
             }
         }
         item {
-            SectionCard("Überwachung & Warnungen", if (notif) Svs.Green else Svs.Amber) {
+            SectionCard("Überwachung & Warnungen", if (notif) Brand.Green else Brand.Amber) {
                 Body("Läuft automatisch im Hintergrund:")
                 Body("• stündlich: neue Apps, neue Bedienungshilfen, Geräteadministratoren, Wechsel des Startbildschirms oder der SMS-App")
                 Body("• sofort: App-Daten gelöscht (z. B. Startbildschirm → Widgets weg), App deinstalliert, Neustart im abgesicherten Modus, neu installierte App mit erhöhtem Risiko-Score (ab „Prüfen“)")
                 Body("• täglich: neue Bedrohungsdaten laden, Vollprüfung, Update-Prüfung")
-                if (!notif) Muted("Benachrichtigungen sind für SVS Security ausgeschaltet – Warnungen erscheinen dann nur in der App.")
+                if (!notif) Muted("Benachrichtigungen sind für Handywächter ausgeschaltet – Warnungen erscheinen dann nur in der App.")
                 if (!notif) OutlinedButton(onClick = { Actions.appSettings(ctx, ctx.packageName) }) { Text("Benachrichtigungen erlauben") }
             }
         }
         item {
             SectionCard("Link prüfen") {
-                Muted("Link einfügen oder in einer anderen App über „Teilen → SVS Security“ senden.")
+                Muted("Link einfügen oder in einer anderen App über „Teilen → Handywächter“ senden.")
                 OutlinedTextField(link, { link = it }, label = { Text("https://…") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Button(onClick = { vm.checkLink(link) }, enabled = link.isNotBlank()) { Text("Prüfen") }
                 linkResult?.let { (host, threat) ->
                     if (threat == null) Body("✅ $host ist in keiner Gefahrenliste. (Garantie für Seriosität ist das nicht – bei Zahlungsaufforderungen immer skeptisch bleiben.)")
                     else {
-                        Text("⛔ $host ist als GEFÄHRLICH gelistet: $threat", color = Svs.Red)
+                        Text("⛔ $host ist als GEFÄHRLICH gelistet: $threat", color = Brand.Red)
                         val allowed = WebShieldService.isAllowed(ctx, host)
                         TextButton(onClick = { WebShieldService.setAllowed(ctx, host, !allowed); tick++ }) {
                             Text(if (allowed) "Ausnahme wieder entfernen" else "Trotzdem zulassen (Ausnahme)")
