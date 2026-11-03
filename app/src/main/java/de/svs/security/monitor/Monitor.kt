@@ -14,13 +14,16 @@ object Monitor {
 
     fun take(ctx: Context): Snapshot {
         val pm = ctx.packageManager
-        val apps = AppInventory.packages(ctx).associate { pi ->
+        val pkgs = AppInventory.packages(ctx)
+        val id = AppInventory.identityIndex(pkgs)
+        val apps = pkgs.associate { pi ->
             val ai = pi.applicationInfo
             pi.packageName to AppEntry(
                 label = ai?.let { runCatching { pm.getApplicationLabel(it).toString() }.getOrNull() } ?: pi.packageName,
                 installer = AppInventory.installerOf(pm, pi.packageName),
                 lastUpdate = pi.lastUpdateTime,
                 system = AppInventory.isSystem(ai),
+                vendor = id.vendorOf[pi.packageName],
             )
         }
         return Snapshot(

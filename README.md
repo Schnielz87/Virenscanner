@@ -38,6 +38,23 @@ Zahlung von 610 € gefordert) und danach verschwundenen Widgets.
 
 Ein Grundstock liegt in `app/src/main/assets/intel/` – die App funktioniert damit auch offline.
 
+## Risikobewertung (Risk Score)
+
+Jede App wird mehrstufig bewertet (`scan/Identity.kt` → `scan/RiskRules.kt`, Gewichte zentral in `scan/RiskConfig.kt`):
+
+1. **Identität & Herkunft:** Installationsquelle (Store, Herstellerkomponente, Systemkomponente, APK, andere App, unbekannt),
+   vorinstalliert oder nachträglich. **Herstellerkomponente** nur, wenn das Signatur-Zertifikat mit dem einer vorinstallierten
+   App desselben Herstellers übereinstimmt (bzw. Plattform-Signatur) – Paketpräfixe wie `com.samsung.*` allein zählen nicht.
+2. **Sonderrechte:** Bedienungshilfe 25, Geräteadministrator 25, Benachrichtigungen 15, Einblenden 12, Apps installieren 10,
+   VPN 10, SMS 10 … (bei bestätigter Identität 30 %).
+3. **Kombinationen:** kein Symbol + unbekannte Quelle + Bedienungshilfe +25, Einblenden + Bedienungshilfe +20,
+   unbekannte Quelle + Geräteadministrator +40, u. a.
+4. **Score 0–100:** 0–19 Unauffällig · 20–39 Geringes Risiko · 40–59 Prüfen · 60–79 Verdächtig · 80–100 Hohes Risiko.
+
+Ein fehlendes App-Symbol zählt nur **3 Punkte** (bei Sprachpaketen, TTS-Stimmen, Plugins, Zubehör-Modulen: 0, mit Begründung).
+Die App spricht nur bei Übereinstimmung mit Bedrohungsdaten von einer „bekannten Spionage-App“, sonst von
+„Verdächtige App“, „Erhöhtes Risiko“ oder „Manuelle Prüfung empfohlen“.
+
 ## Update-Funktion
 
 Wie bei den anderen Apps: Jeder Push baut per GitHub Actions eine neue APK

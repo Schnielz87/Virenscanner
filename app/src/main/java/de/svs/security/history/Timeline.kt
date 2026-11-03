@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import de.svs.security.scan.AppInventory
+import de.svs.security.scan.Identity
 import de.svs.security.scan.RiskRules
 
 /**
@@ -45,11 +46,16 @@ object Timeline {
 
     private fun installEvents(ctx: Context, pm: PackageManager, from: Long, to: Long, label: (String) -> String): List<LogEvent> {
         val out = mutableListOf<LogEvent>()
-        for (pi in AppInventory.packages(ctx)) {
+        val pkgs = AppInventory.packages(ctx)
+        val id = AppInventory.identityIndex(pkgs)
+        for (pi in pkgs) {
             val ai = pi.applicationInfo
             val system = AppInventory.isSystem(ai)
             val installer = AppInventory.installerOf(pm, pi.packageName)
-            val unknown = !system && installer !in RiskRules.TRUSTED_INSTALLERS
+            val preinstalled = ai != null && (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val vendor = id.vendorOf[pi.packageName]
+            val src = Identity.installSource(installer, preinstalled, id.systemPkgs, id.vendorOf.keys)
+            val unknown = !system && vendor == null && !src.trusted
             if (pi.firstInstallTime in from..to && pi.firstInstallTime > 1_300_000_000_000L) out += LogEvent(
                 pi.firstInstallTime, "INSTALL", "App installiert: ${label(pi.packageName)}",
                 "Quelle: ${RiskRules.installerLabel(installer)} · Version ${pi.versionName ?: "?"}", pi.packageName, alert = unknown,

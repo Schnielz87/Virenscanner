@@ -1,39 +1,70 @@
 package de.svs.security.scan
 
 import de.svs.security.intel.ThreatDb
+import java.util.concurrent.TimeUnit
+
+/** Risikostufe aus dem Score (Grenzen in [RiskConfig]). */
+enum class RiskLevel(val label: String) {
+    NONE("Unauffällig"), LOW("Geringes Risiko"), CHECK("Prüfen"), SUSPICIOUS("Verdächtig"), HIGH("Hohes Risiko");
+
+    val severity: Severity get() = when (this) {
+        HIGH -> Severity.CRITICAL; SUSPICIOUS -> Severity.HIGH; CHECK -> Severity.MEDIUM; LOW -> Severity.LOW; NONE -> Severity.INFO
+    }
+
+    companion object {
+        fun of(score: Int) = when {
+            score >= RiskConfig.LEVEL_HIGH -> HIGH
+            score >= RiskConfig.LEVEL_SUSPICIOUS -> SUSPICIOUS
+            score >= RiskConfig.LEVEL_CHECK -> CHECK
+            score >= RiskConfig.LEVEL_LOW -> LOW
+            else -> NONE
+        }
+    }
+}
+
+/** Ergebnis der Bewertung einer App – mit allen Gruenden. */
+data class AppAssessment(
+    val app: AppInfo,
+    val score: Int,
+    val level: RiskLevel,
+    /** Faktoren, die den Score erhoeht haben ("+25 Bedienungshilfe aktiv") */
+    val factors: List<String>,
+    /** Warum etwas als unkritisch eingestuft wurde */
+    val neutral: List<String>,
+    /** Kurzbeschreibung der Identitaet, z. B. "System-/Herstellerkomponente (Samsung, Signatur bestätigt)" */
+    val identity: String,
+    val kind: ComponentKind,
+    val rights: List<String>,
+    val iocMatch: String?,
+)
 
 /**
- * Bewertungsregeln je App. Reine Logik (Unit-Tests in RiskRulesTest).
+ * Mehrstufige Risikoanalyse je App: Identitaet -> Sonderrechte -> Kombinationen -> Score.
+ * Einzige Bewertungslogik der App (Scanner, Sofortpruefung, Bericht nutzen sie).
  */
 object RiskRules {
 
-    /** Offizielle App-Stores. Alles andere gilt als "aus unbekannter Quelle" (Sideloading). */
-    val TRUSTED_INSTALLERS = setOf(
-        "com.android.vending",                 // Google Play
-        "com.sec.android.app.samsungapps",     // Galaxy Store
-        "com.google.android.feedback",
-        "com.amazon.venezia",
-        "com.huawei.appmarket",
-    )
+    val TRUSTED_INSTALLERS = Identity.STORES
 
     /** Bekannte, unbedenkliche Startbildschirme (Launcher). */
     val TRUSTED_LAUNCHERS = setOf(
-        "com.sec.android.app.launcher",        // Samsung One UI Home
-        "com.sec.android.emergencylauncher",
-        "com.google.android.apps.nexuslauncher",
-        "com.android.launcher3",
-        "com.google.android.launcher",
-        "com.miui.home", "com.huawei.android.launcher", "com.oneplus.launcher", "com.motorola.launcher3",
-        "com.microsoft.launcher", "com.teslacoilsw.launcher",
+        "com.sec.android.app.launcher", "com.sec.android.emergencylauncher", "com.google.android.apps.nexuslauncher",
+        "com.android.launcher3", "com.google.android.launcher", "com.miui.home", "com.huawei.android.launcher",
+        "com.oneplus.launcher", "com.motorola.launcher3", "com.microsoft.launcher", "com.teslacoilsw.launcher",
     )
 
     private val SMS_PERMS = setOf("android.permission.READ_SMS", "android.permission.RECEIVE_SMS", "android.permission.SEND_SMS")
-    private val SPY_PERMS = setOf(
-        "android.permission.RECORD_AUDIO", "android.permission.READ_CALL_LOG", "android.permission.READ_CONTACTS",
-        "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_BACKGROUND_LOCATION", "android.permission.CAMERA",
-    )
+    private val PHONE_PERMS = setOf("android.permission.READ_CALL_LOG", "android.permission.CALL_PHONE", "android.permission.READ_PHONE_NUMBERS", "android.permission.PROCESS_OUTGOING_CALLS")
+    private const val CONTACTS = "android.permission.READ_CONTACTS"
+    private const val MIC = "android.permission.RECORD_AUDIO"
+    private const val CAMERA = "android.permission.CAMERA"
+    private const val FINE_LOC = "android.permission.ACCESS_FINE_LOCATION"
+    private const val BG_LOC = "android.permission.ACCESS_BACKGROUND_LOCATION"
+    private const val BOOT = "android.permission.RECEIVE_BOOT_COMPLETED"
+    private const val INTERNET = "android.permission.INTERNET"
 
-    fun isSideloaded(a: AppInfo) = !a.system && a.installer !in TRUSTED_INSTALLERS
+    /** Ist die Herkunft unbekannt (weder Store, noch Hersteller, noch System)? */
+    fun isSideloaded(a: AppInfo) = !a.system && a.vendor == null && !a.installSource.trusted
 
     fun installerLabel(installer: String?): String = when (installer) {
         null, "" -> "unbekannt / vorinstalliert"
@@ -46,97 +77,148 @@ object RiskRules {
         "com.sec.android.app.myfiles" -> "über „Eigene Dateien“ installiert"
         "com.whatsapp" -> "über WhatsApp erhalten"
         "org.telegram.messenger" -> "über Telegram erhalten"
+        "com.samsung.android.app.watchmanager" -> "über Galaxy Wearable installiert"
+        "com.samsung.SMT" -> "über Samsung TTS installiert"
         "de.svs.security" -> "SVS Security (Update)"
-        else -> installer
+        else -> "über $installer installiert"
     }
 
-    fun evaluate(a: AppInfo, db: ThreatDb, ownPkg: String): List<Finding> {
-        if (a.pkg == ownPkg) return emptyList()
-        val out = mutableListOf<Finding>()
-        val name = "${a.label} (${a.pkg})"
-        val side = isSideloaded(a)
+    private fun pts(p: Int, factor: Double) = Math.round(p * factor).toInt()
 
-        // 1) Bekannte Schadsoftware laut Bedrohungsdaten
-        a.sha256?.let { h -> db.hashThreat(h)?.let { out += critical(a, "Bekannte Schad-App erkannt: $it", "Der Fingerabdruck (SHA-256) von $name stimmt mit einer bekannten Spionage-/Schad-App überein.") } }
-        if (!a.system) db.packageThreat(a.pkg)?.let { out += critical(a, "Spionage-App erkannt: $it", "Der Paketname von $name gehört zu einer bekannten Spionage-App ($it).") }
-        a.certSha1.firstNotNullOfOrNull { db.certThreat(it) }?.let {
-            out += critical(a, "Signatur einer Spionage-App: $it", "$name ist mit dem Zertifikat einer bekannten Spionage-App ($it) signiert.")
+    fun assess(a: AppInfo, db: ThreatDb, now: Long = System.currentTimeMillis()): AppAssessment {
+        val factors = mutableListOf<String>()
+        val neutral = mutableListOf<String>()
+        var score = 0
+        fun add(p: Int, why: String) { if (p > 0) { score += p; factors += "+$p $why" } }
+
+        val kind = Identity.kind(a.pkg, a.label)
+        val verified = a.vendor != null
+        val trustedIdentity = verified || a.preinstalled
+        val unknown = isSideloaded(a)
+        val rightsFactor = if (trustedIdentity) RiskConfig.TRUSTED_RIGHTS_FACTOR else 1.0
+
+        val identity = when {
+            verified && a.preinstalled -> "System-/Herstellerkomponente (${a.vendor}, vorinstalliert, Signatur bestätigt)"
+            verified -> "Herstellerkomponente (${a.vendor}, Signatur bestätigt)"
+            a.preinstalled -> "Vorinstallierte Systemkomponente"
+            a.installSource == InstallSource.STORE -> "App aus offiziellem Store"
+            a.installSource.trusted -> "Nutzer-App, ${a.installSource.label}"
+            else -> "Nutzer-App, ${a.installSource.label}"
         }
-        if (out.isNotEmpty()) return out
 
-        if (a.system) {
-            // Systemapps nur pruefen, wenn sie ungewoehnliche Rollen haben
-            if (a.defaultHome && a.pkg !in TRUSTED_LAUNCHERS) out += launcherFinding(a, name)
-            return out
+        // 1) Indikator-Treffer
+        var ioc: String? = null
+        a.sha256?.let { h -> db.hashThreat(h)?.let { ioc = it; add(RiskConfig.IOC_HASH, "APK-Fingerabdruck stimmt mit der bekannten Spionage-App „$it“ überein") } }
+        a.certSha1.firstNotNullOfOrNull { db.certThreat(it) }?.let { if (ioc == null) { ioc = it; add(RiskConfig.IOC_CERT, "Signatur-Zertifikat gehört zur bekannten Spionage-App „$it“") } }
+        if (ioc == null && !trustedIdentity) db.packageThreat(a.pkg)?.let { ioc = it; add(RiskConfig.IOC_PACKAGE, "Paketname steht auf der Liste bekannter Spionage-Apps („$it“)") }
+
+        // 2) Herkunft & Identitaet
+        if (unknown) {
+            add(RiskConfig.UNKNOWN_SOURCE, "nicht aus Store/Hersteller/System (${a.installSource.label}: ${installerLabel(a.installer)})")
+            if (a.installSource == InstallSource.OTHER_APP && a.installer in Identity.RELAY_INSTALLERS) add(RiskConfig.VIA_BROWSER_OR_MESSENGER, "über Browser/Messenger/Dateimanager erhalten")
+        } else {
+            neutral += "Herkunft: ${if (a.preinstalled) "vorinstalliert" else a.installSource.label}"
         }
+        if (verified) neutral += "Signatur von ${a.vendor} bestätigt (gleiches Zertifikat wie vorinstallierte ${a.vendor}-Apps)"
 
-        // 2) Gefaehrliche Rollen / Rechte
-        if (a.accessibility) out += Finding(
-            if (side) Severity.HIGH else Severity.MEDIUM,
-            "Bedienungshilfe aktiv: ${a.label}",
-            "$name darf als Bedienungshilfe den Bildschirm mitlesen und Eingaben auslösen. Das ist der häufigste Weg, über den Banking-Trojaner Handys fernsteuern." +
-                if (side) " Die App stammt NICHT aus einem offiziellen Store." else "",
-            "Wenn du diese App nicht bewusst als Bedienungshilfe eingerichtet hast: Bedienungshilfe ausschalten und App deinstallieren.",
-            a.pkg, FixAction.ACCESSIBILITY,
-        )
-        if (a.deviceAdmin) out += Finding(
-            if (side) Severity.HIGH else Severity.LOW,
-            "Geräteadministrator: ${a.label}",
-            "$name ist als Geräteadministrator eingetragen und kann z. B. das Handy sperren, löschen oder die eigene Deinstallation verhindern.",
-            "Unter Einstellungen → Sicherheit → Geräteadministratoren entfernen, falls unbekannt – danach lässt sich die App deinstallieren.",
-            a.pkg, FixAction.DEVICE_ADMIN,
-        )
-        if (a.notificationListener && side) out += Finding(
-            Severity.MEDIUM, "Liest Benachrichtigungen mit: ${a.label}",
-            "$name hat Zugriff auf alle Benachrichtigungen (z. B. SMS-TANs, Chat-Nachrichten) und stammt nicht aus einem offiziellen Store.",
-            "Zugriff auf Benachrichtigungen entziehen, falls nicht gewollt.", a.pkg, FixAction.NOTIFICATION_ACCESS,
-        )
-        if (a.defaultHome && a.pkg !in TRUSTED_LAUNCHERS) out += launcherFinding(a, name)
-        if (a.defaultSms) out += Finding(
-            if (side) Severity.HIGH else Severity.LOW, "Fremde Standard-SMS-App: ${a.label}",
-            "$name ist als Standard-SMS-App eingestellt und kann alle SMS (auch Bank-TANs) lesen und senden.",
-            "Unter Einstellungen → Apps → Standard-Apps wieder „Nachrichten“ wählen, falls nicht gewollt.", a.pkg, FixAction.APP_SETTINGS,
-        )
-
-        // 3) Herkunft und Verhalten
-        if (side) {
-            val sms = a.grantedPerms.any { it in SMS_PERMS }
-            val spy = a.grantedPerms.count { it in SPY_PERMS }
+        if (!a.hasLauncher) {
             when {
-                !a.hasLauncher -> out += Finding(
-                    Severity.HIGH, "Versteckte App ohne Symbol: ${a.label}",
-                    "$name wurde außerhalb eines App-Stores installiert (${installerLabel(a.installer)}) und hat kein App-Symbol – typisch für Trojaner, die sich verstecken.",
-                    "Prüfen, ob du die App kennst. Wenn nicht: deinstallieren.", a.pkg, FixAction.UNINSTALL,
-                )
-                sms || spy >= 3 -> out += Finding(
-                    Severity.MEDIUM, "Unbekannte Quelle mit weitreichenden Rechten: ${a.label}",
-                    "$name stammt nicht aus einem offiziellen Store (${installerLabel(a.installer)}) und darf ${if (sms) "SMS lesen" else "Mikrofon/Standort/Kontakte nutzen"}.",
-                    "Nur behalten, wenn du die App bewusst installiert hast.", a.pkg, FixAction.APP_SETTINGS,
-                )
-                else -> out += Finding(
-                    Severity.LOW, "Aus unbekannter Quelle installiert: ${a.label}",
-                    "$name wurde ${installerLabel(a.installer)}.",
-                    "Unbedenklich, wenn du die APK selbst installiert hast (z. B. eigene Apps von GitHub).", a.pkg, FixAction.APP_SETTINGS,
-                )
+                trustedIdentity || kind != ComponentKind.APP && !unknown ->
+                    neutral += "Kein App-Symbol: normal für ${if (kind == ComponentKind.APP) "Systemkomponenten" else "ein(e) ${kind.label}"}"
+                else -> add(RiskConfig.NO_LAUNCHER_ICON, "kein App-Symbol (allein unkritisch)")
             }
-            if (a.overlayAllowed) out += Finding(
-                Severity.MEDIUM, "Darf über anderen Apps einblenden: ${a.label}",
-                "$name (unbekannte Quelle) darf Fenster über anderen Apps anzeigen – so werden z. B. gefälschte Anmeldemasken über Banking-Apps gelegt.",
-                "Unter App-Info → „Über anderen Apps einblenden“ ausschalten, falls nicht nötig.", a.pkg, FixAction.APP_SETTINGS,
-            )
         }
-        return out
+        val odd = if (trustedIdentity) null else Identity.unusualName(a.pkg, a.label)
+        odd?.let { add(RiskConfig.UNUSUAL_NAME, it) }
+        val imp = Identity.impersonation(a.pkg, a.label, verified, a.preinstalled)
+            ?.takeIf { Identity.claimedVendor(a.pkg) != null || unknown }
+        imp?.let { add(RiskConfig.IMPERSONATION, it) }
+
+        // 3) Sonderrechte (einzeln)
+        val rights = mutableListOf<String>()
+        val g = a.grantedPerms
+        fun right(cond: Boolean, p: Int, name: String) { if (cond) { rights += name; add(pts(p, rightsFactor), name + if (rightsFactor < 1) " (reduziert gewichtet: bestätigte Identität)" else "") } }
+        right(a.accessibility, RiskConfig.ACCESSIBILITY, "Bedienungshilfe aktiv")
+        right(a.deviceAdmin, RiskConfig.DEVICE_ADMIN, "Geräteadministrator")
+        right(a.overlayAllowed, RiskConfig.OVERLAY, "darf über anderen Apps einblenden")
+        right(a.notificationListener, RiskConfig.NOTIFICATION_LISTENER, "liest Benachrichtigungen")
+        right(a.canInstallPackages, RiskConfig.INSTALL_PACKAGES, "darf Apps installieren")
+        right(a.vpnService && !trustedIdentity, RiskConfig.VPN_SERVICE, "bringt einen VPN-Dienst mit")
+        right(a.defaultSms && !a.preinstalled, RiskConfig.DEFAULT_SMS, "ist Standard-SMS-App")
+        right(a.defaultHome && a.pkg !in TRUSTED_LAUNCHERS, RiskConfig.FOREIGN_LAUNCHER, "ist als Startbildschirm eingestellt")
+        right(g.any { it in SMS_PERMS }, RiskConfig.SMS, "SMS lesen/senden")
+        right(g.any { it in PHONE_PERMS }, RiskConfig.PHONE, "Telefon/Anrufliste")
+        right(CONTACTS in g, RiskConfig.CONTACTS, "Kontakte")
+        right(MIC in g, RiskConfig.MICROPHONE, "Mikrofon")
+        right(CAMERA in g, RiskConfig.CAMERA, "Kamera")
+        right(BG_LOC in g, RiskConfig.BACKGROUND_LOCATION, "Standort im Hintergrund")
+        right(FINE_LOC in g && BG_LOC !in g, RiskConfig.LOCATION, "genauer Standort")
+        if (BOOT in a.requestedPerms && unknown) { rights += "Autostart nach dem Einschalten"; add(RiskConfig.AUTOSTART, "startet automatisch nach dem Einschalten") }
+
+        // 4) Kombinationen
+        val powerful = a.accessibility || a.deviceAdmin || a.overlayAllowed || a.notificationListener
+        if (!a.hasLauncher && unknown && a.accessibility) add(RiskConfig.COMBO_HIDDEN_ACCESSIBILITY, "Kombination: kein Symbol + unbekannte Quelle + Bedienungshilfe")
+        if (a.overlayAllowed && a.accessibility) add(pts(RiskConfig.COMBO_OVERLAY_ACCESSIBILITY, rightsFactor), "Kombination: Einblenden + Bedienungshilfe")
+        if (unknown && a.deviceAdmin) add(RiskConfig.COMBO_UNKNOWN_ADMIN, "Kombination: unbekannte Quelle + Geräteadministrator")
+        val recent = a.firstInstall > 0 && now - a.firstInstall <= TimeUnit.DAYS.toMillis(RiskConfig.RECENT_DAYS.toLong())
+        if (recent && unknown && (odd != null || imp != null) && powerful) add(RiskConfig.COMBO_RECENT_ODD_POWERFUL, "Kombination: kürzlich installiert + ungewöhnlicher Name + Sonderrechte")
+        if (unknown && INTERNET in a.requestedPerms && (a.accessibility || a.overlayAllowed)) add(RiskConfig.COMBO_WEB_POWERFUL, "Kombination: kann Webseiten laden/öffnen + Bedienungshilfe/Einblenden")
+        val spy = listOf(MIC in g, CAMERA in g, CONTACTS in g, g.any { it in PHONE_PERMS }, FINE_LOC in g || BG_LOC in g).count { it }
+        if (unknown && spy >= 3) add(RiskConfig.COMBO_SPY_PERMS, "Kombination: unbekannte Quelle + $spy Überwachungs-Rechte")
+
+        if (!powerful && !unknown && ioc == null) neutral += "Keine kritische Kombination von Sonderrechten erkannt"
+        else if (!powerful && ioc == null) neutral += "Keine Bedienungshilfe, kein Geräteadministrator, kein Einblenden, kein Benachrichtigungszugriff"
+
+        val s = score.coerceIn(0, 100)
+        return AppAssessment(a, s, RiskLevel.of(s), factors, neutral, identity, kind, rights, ioc)
     }
 
-    private fun launcherFinding(a: AppInfo, name: String) = Finding(
-        Severity.HIGH, "Fremder Startbildschirm aktiv: ${a.label}",
-        "$name ist als Startbildschirm (Launcher) eingestellt. Ein anderer Launcher zeigt andere Widgets und Symbole an – das kann verschwundene Widgets erklären.",
-        "Einstellungen → Apps → Standard-Apps → Startbildschirm → „One UI Home“ wählen.", a.pkg, FixAction.HOME_SETTINGS,
-    )
+    /** Treffer fuer die Befundliste (ab [RiskConfig.SHOW_FROM]). */
+    fun evaluate(a: AppInfo, db: ThreatDb, ownPkg: String, now: Long = System.currentTimeMillis()): List<Finding> {
+        if (a.pkg == ownPkg) return emptyList()
+        val r = assess(a, db, now)
+        if (r.score < RiskConfig.SHOW_FROM) return emptyList()
+        return listOf(toFinding(r))
+    }
 
-    private fun critical(a: AppInfo, title: String, detail: String) = Finding(
-        Severity.CRITICAL, title, detail,
-        "Sofort deinstallieren. Falls das nicht geht: zuerst unter Geräteadministratoren/Bedienungshilfen die Rechte entziehen. Danach Passwörter (Google, Bank, E-Mail) von einem anderen Gerät aus ändern.",
-        a.pkg, FixAction.UNINSTALL,
-    )
+    fun toFinding(r: AppAssessment): Finding {
+        val a = r.app
+        val title = when {
+            r.iocMatch != null -> "Übereinstimmung mit bekannter Spionage-App „${r.iocMatch}“: ${a.label}"
+            r.level == RiskLevel.HIGH -> "Hohes Risiko: ${a.label}"
+            r.level == RiskLevel.SUSPICIOUS -> "Verdächtige App: ${a.label}"
+            r.level == RiskLevel.CHECK -> "Manuelle Prüfung empfohlen: ${a.label}"
+            else -> "Geringes Risiko: ${a.label}"
+        }
+        val detail = "Auffällig wegen: " + r.factors.joinToString("; ") { it.substringAfter(' ') }
+        val advice = when {
+            r.iocMatch != null || r.level == RiskLevel.HIGH ->
+                "Wenn du die App nicht bewusst installiert hast: Sonderrechte (Bedienungshilfe/Geräteadministrator) entziehen und deinstallieren. Danach wichtige Passwörter von einem anderen Gerät ändern."
+            r.level == RiskLevel.SUSPICIOUS -> "Prüfen, ob du die App kennst und die Sonderrechte brauchst. Wenn nicht: Rechte entziehen und deinstallieren."
+            r.level == RiskLevel.CHECK -> "Prüfen, ob die Sonderrechte gewollt sind."
+            else -> "Meist harmlos, z. B. selbst installierte APK – nur zur Kenntnis."
+        }
+        val action = when {
+            r.level >= RiskLevel.SUSPICIOUS && a.deviceAdmin -> FixAction.DEVICE_ADMIN
+            r.level >= RiskLevel.SUSPICIOUS && a.accessibility -> FixAction.ACCESSIBILITY
+            r.level >= RiskLevel.SUSPICIOUS -> FixAction.UNINSTALL
+            a.defaultHome && a.pkg !in TRUSTED_LAUNCHERS -> FixAction.HOME_SETTINGS
+            else -> FixAction.APP_SETTINGS
+        }
+        return Finding(
+            r.level.severity, title, detail, advice, a.pkg, action,
+            score = r.score,
+            facts = listOf(
+                "Risikostufe" to "${r.level.label} (Score ${r.score}/100)",
+                "Paket" to a.pkg,
+                "Identität" to r.identity,
+                "Art" to r.kind.label,
+                "System/User" to if (a.preinstalled) "System-App (vorinstalliert${if (a.updatedSystem) ", aktualisiert" else ""})" else "User-App (nachträglich installiert)",
+                "Installationsquelle" to "${r.app.installSource.label} – ${installerLabel(a.installer)}",
+                "Sonderrechte" to r.rights.ifEmpty { listOf("keine") }.joinToString(", "),
+            ) + (a.certSubject?.let { listOf("Signiert von" to it) } ?: emptyList()),
+            factors = r.factors,
+            neutral = r.neutral,
+        )
+    }
 }

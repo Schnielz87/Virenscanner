@@ -22,6 +22,8 @@ data class ReportData(
     val events: List<LogEvent>,
     val eventDays: Int,
     val intel: List<Pair<String, String>>,
+    /** Apps ohne Symbol, die als unkritisch eingestuft wurden (Zeile mit Begruendung) */
+    val cleared: List<String> = emptyList(),
 )
 
 /** Erzeugt die Gesamtuebersicht als gut lesbaren Text (zum Kopieren, Teilen oder Speichern). */
@@ -48,7 +50,7 @@ object ReportFormatter {
         } else {
             val worst = s.worst
             val verdict = when {
-                worst == null || worst == Severity.LOW -> "UNAUFFÄLLIG – keine Schadsoftware gefunden"
+                worst == null || worst == Severity.LOW -> "UNAUFFÄLLIG – keine verdächtige App gefunden"
                 worst == Severity.MEDIUM -> "PRÜFEN – einige Punkte sollten angesehen werden"
                 else -> "HANDLUNGSBEDARF – mindestens ein hoher/kritischer Befund"
             }
@@ -64,13 +66,27 @@ object ReportFormatter {
         section("2. ALLE BEFUNDE (nach Schwere sortiert)")
         if (s == null || s.findings.isEmpty()) appendLine("Keine Befunde.")
         else s.findings.forEachIndexed { i, f ->
-            appendLine("${i + 1}. [${f.severity.label.uppercase()}] ${f.title}")
-            if (f.pkg != null) appendLine("   Paket:      ${f.pkg}")
-            appendLine("   Befund:     ${f.detail}")
+            appendLine("${i + 1}. [${f.levelText.uppercase()}] ${f.title}")
+            if (f.facts.isNotEmpty()) {
+                f.facts.forEach { (k, v) -> appendLine("   ${(k + ":").padEnd(21)} $v") }
+                if (f.factors.isNotEmpty()) appendLine("   Score erhöht durch:")
+                f.factors.forEach { appendLine("     $it") }
+                if (f.neutral.isNotEmpty()) appendLine("   Als unkritisch eingestuft:")
+                f.neutral.forEach { appendLine("     ✓ $it") }
+            } else {
+                if (f.pkg != null) appendLine("   Paket:      ${f.pkg}")
+                appendLine("   Befund:     ${f.detail}")
+            }
             appendLine("   Empfehlung: ${f.advice}")
             appendLine()
         }
         appendLine()
+
+        if (r.cleared.isNotEmpty()) {
+            section("2b. APPS OHNE SYMBOL – ALS UNKRITISCH EINGESTUFT (${r.cleared.size})")
+            r.cleared.forEach { appendLine("• $it") }
+            appendLine()
+        }
 
         // 3. Geraetestatus
         section("3. GERÄTESTATUS")
@@ -139,10 +155,14 @@ object ReportFormatter {
 
         // 9. Legende
         section("9. SO LIEST DU DIE BEWERTUNG")
-        appendLine("KRITISCH  bekannte Schad-/Spionage-App (Paketname, Zertifikat oder Fingerabdruck stimmt) – sofort entfernen.")
-        appendLine("HOCH      typisches Trojaner-Merkmal (z. B. versteckte App aus unbekannter Quelle mit Bedienungshilfe) – zeitnah prüfen.")
-        appendLine("MITTEL    weitreichende Rechte oder riskante Einstellung – prüfen, ob gewollt.")
-        appendLine("GERING    meist harmlos (z. B. selbst installierte APK) – nur zur Kenntnis.")
+        appendLine("Jede App erhält einen Risk Score 0–100 aus Herkunft, Identität (Signatur), Sonderrechten und deren Kombination.")
+        appendLine("  0–19  Unauffällig      kein Treffer")
+        appendLine(" 20–39  Geringes Risiko  meist harmlos, z. B. selbst installierte APK")
+        appendLine(" 40–59  Prüfen           Sonderrechte prüfen – gewollt?")
+        appendLine(" 60–79  Verdächtig       auffällige Kombination – App und Rechte prüfen")
+        appendLine(" 80–100 Hohes Risiko     starke Kombination oder Übereinstimmung mit bekannter Spionage-App")
+        appendLine("Ein fehlendes App-Symbol zählt nur 3 Punkte und ist bei Sprachpaketen, Plugins und Diensten normal.")
+        appendLine("Die Bewertung ist ein Risiko-Hinweis, kein Nachweis von Schadsoftware (außer bei Indikator-Übereinstimmung).")
         appendLine("Hinweis: Android protokolliert, welche App wann aktiv war – nicht, welche Person das Handy bedient hat.")
         appendLine(LINE)
     }

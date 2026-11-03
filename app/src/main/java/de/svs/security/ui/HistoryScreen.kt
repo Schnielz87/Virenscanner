@@ -102,7 +102,7 @@ private fun Summary(ev: List<LogEvent>) {
         Body("• $pkgInstaller× App-Installationsprogramm geöffnet (APK-Installation)")
         Body("• $settings× Einstellungen geöffnet")
         if (cleared.isNotEmpty()) Body("• App-Daten gelöscht: ${cleared.joinToString { it.title.removePrefix("App-Daten gelöscht: ") }}")
-        if (unknownInstalls == 0 && pkgInstaller == 0 && safe == 0) Muted("Keine Installation aus unbekannter Quelle im Zeitraum – ein Trojaner wurde in diesem Zeitraum demnach nicht installiert.")
+        if (unknownInstalls == 0 && pkgInstaller == 0 && safe == 0) Muted("Keine Installation aus unbekannter Quelle im Zeitraum – es wurde in dieser Zeit keine App außerhalb von Store, Hersteller oder System installiert.")
     }
 }
 

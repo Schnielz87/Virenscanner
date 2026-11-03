@@ -54,7 +54,7 @@ fun ScanScreen(vm: AppViewModel, modifier: Modifier, goTo: (Tab) -> Unit) {
             val worst = result?.worst
             val (icon, color, headline) = when {
                 result == null -> Triple(Icons.Filled.GppMaybe, Svs.Grey, "Noch nicht geprüft")
-                worst == null || worst == Severity.LOW -> Triple(Icons.Filled.CheckCircle, Svs.Green, "Keine Schadsoftware gefunden")
+                worst == null || worst == Severity.LOW -> Triple(Icons.Filled.CheckCircle, Svs.Green, "Keine verdächtigen Apps gefunden")
                 worst == Severity.MEDIUM -> Triple(Icons.Filled.Warning, Svs.Amber, "Einige Punkte prüfen")
                 else -> Triple(Icons.Filled.Warning, Svs.Red, "Handlungsbedarf")
             }
@@ -104,7 +104,7 @@ fun ScanScreen(vm: AppViewModel, modifier: Modifier, goTo: (Tab) -> Unit) {
             val low = r.findings.filter { it.severity > Severity.MEDIUM }
             if (important.isEmpty()) item {
                 SectionCard("Keine kritischen Befunde", Svs.Green) {
-                    Body("Keine bekannte Schad- oder Spionage-App, keine versteckte App aus unbekannter Quelle, keine verdächtigen Bedienungshilfen oder Geräteadministratoren.")
+                    Body("Keine Übereinstimmung mit bekannten Spionage-Apps und keine App mit verdächtiger Kombination aus Herkunft und Sonderrechten. Systemkomponenten ohne App-Symbol (z. B. Sprachpakete, Buds-Plugins) werden nicht als Risiko gewertet.")
                 }
             }
             items(important) { FindingCard(it) }
@@ -123,12 +123,23 @@ fun FindingCard(f: Finding) {
     SectionCard {
         Column(Modifier.clickable { open = !open }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Pill(f.severity.label, Svs.color(f.severity))
+                Pill(f.levelText, Svs.color(f.severity))
                 Spacer(Modifier.width(8.dp))
                 Text(f.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
             if (open) {
-                Body(f.detail)
+                if (f.facts.isEmpty()) Body(f.detail)
+                f.facts.forEach { (k, v) ->
+                    Row { Text("$k: ", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold); Text(v, style = MaterialTheme.typography.bodySmall) }
+                }
+                if (f.factors.isNotEmpty()) {
+                    Text("Score erhöht durch:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    f.factors.forEach { Text("  $it", style = MaterialTheme.typography.bodySmall, color = Svs.color(f.severity)) }
+                }
+                if (f.neutral.isNotEmpty()) {
+                    Text("Als unkritisch eingestuft:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    f.neutral.forEach { Text("  ✓ $it", style = MaterialTheme.typography.bodySmall, color = Svs.Green) }
+                }
                 Text("Empfehlung: ${f.advice}", style = MaterialTheme.typography.bodySmall)
             }
         }

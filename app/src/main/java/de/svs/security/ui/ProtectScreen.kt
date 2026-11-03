@@ -69,7 +69,7 @@ fun ProtectScreen(vm: AppViewModel, modifier: Modifier, shared: String?, enableS
             SectionCard("Überwachung & Warnungen", if (notif) Svs.Green else Svs.Amber) {
                 Body("Läuft automatisch im Hintergrund:")
                 Body("• stündlich: neue Apps, neue Bedienungshilfen, Geräteadministratoren, Wechsel des Startbildschirms oder der SMS-App")
-                Body("• sofort: App-Daten gelöscht (z. B. Startbildschirm → Widgets weg), App deinstalliert, Neustart im abgesicherten Modus, neu installierte App mit Schadsoftware-Merkmalen")
+                Body("• sofort: App-Daten gelöscht (z. B. Startbildschirm → Widgets weg), App deinstalliert, Neustart im abgesicherten Modus, neu installierte App mit erhöhtem Risiko-Score (ab „Prüfen“)")
                 Body("• täglich: neue Bedrohungsdaten laden, Vollprüfung, Update-Prüfung")
                 if (!notif) Muted("Benachrichtigungen sind für SVS Security ausgeschaltet – Warnungen erscheinen dann nur in der App.")
                 if (!notif) OutlinedButton(onClick = { Actions.appSettings(ctx, ctx.packageName) }) { Text("Benachrichtigungen erlauben") }

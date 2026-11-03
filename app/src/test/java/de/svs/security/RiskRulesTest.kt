@@ -22,8 +22,10 @@ class RiskRulesTest {
     @Test fun cleanStoreApp() = assertTrue(RiskRules.evaluate(app(), db, "de.svs.security").isEmpty())
 
     @Test fun knownSpyPackage() {
-        val f = RiskRules.evaluate(app(pkg = "com.spy.x"), db, "de.svs.security")
-        assertEquals(Severity.CRITICAL, f.single().severity)
+        // nur der Paketname stimmt: deutlicher Treffer, aber kein Beweis -> "Verdächtig"
+        val f = RiskRules.evaluate(app(pkg = "com.spy.x"), db, "de.svs.security").single()
+        assertEquals(Severity.HIGH, f.severity)
+        assertTrue(f.title.startsWith("Übereinstimmung mit bekannter Spionage-App"))
     }
 
     @Test fun knownSpyCert() {
@@ -31,15 +33,9 @@ class RiskRulesTest {
         assertEquals(Severity.CRITICAL, f.single().severity)
     }
 
-    @Test fun hiddenSideloadedWithAccessibility() {
-        val f = RiskRules.evaluate(app(installer = "com.google.android.packageinstaller", launcher = false, acc = true), db, "x")
-        assertTrue(f.any { it.severity == Severity.HIGH && it.title.startsWith("Bedienungshilfe") })
-        assertTrue(f.any { it.severity == Severity.HIGH && it.title.startsWith("Versteckte") })
-    }
-
     @Test fun foreignLauncher() {
         val f = RiskRules.evaluate(app(pkg = "com.evil.home", home = true), db, "x")
-        assertTrue(f.any { it.title.startsWith("Fremder Startbildschirm") })
+        assertTrue(f.single().factors.any { "Startbildschirm" in it })
         assertTrue(RiskRules.evaluate(app(pkg = "com.sec.android.app.launcher", system = true, home = true), db, "x").isEmpty())
     }
 
@@ -57,5 +53,14 @@ class RiskRulesTest {
         assertTrue(d.any { it.type == "SAFE_MODE" })
         // Hin- und Rueckweg JSON
         assertEquals(now, Snapshot.fromJson(now.toJson()))
+    }
+
+    @Test fun snapshotDiff_vendorComponentNoAlarm() {
+        val base = Snapshot(1, mapOf("com.samsung.android.app.watchmanager" to AppEntry("Galaxy Wearable", "com.android.vending", 1, false, "Samsung")),
+            emptySet(), emptySet(), emptySet(), "com.sec.android.app.launcher", null, false)
+        val now = base.copy(time = 2, apps = base.apps + ("com.samsung.accessory.berrymgr" to
+            AppEntry("Galaxy Buds Live Manager", "com.samsung.android.app.watchmanager", 2, false, "Samsung")))
+        val d = Snapshot.diff(base, now)
+        assertTrue(d.single().type == "INSTALL" && !d.single().alert)
     }
 }

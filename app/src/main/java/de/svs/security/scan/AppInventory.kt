@@ -67,23 +67,51 @@ object AppInventory {
             .map { it.activityInfo.packageName }.toSet()
     }.getOrNull().orEmpty()
 
-    private fun overlayAllowed(ctx: Context, ai: ApplicationInfo, requested: Boolean): Boolean {
-        if (!requested) return false
-        return runCatching {
-            val ops = ctx.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-            val mode = if (Build.VERSION.SDK_INT >= 29) ops.unsafeCheckOpNoThrow("android:system_alert_window", ai.uid, ai.packageName)
-            else @Suppress("DEPRECATION") ops.checkOpNoThrow("android:system_alert_window", ai.uid, ai.packageName)
-            mode == AppOpsManager.MODE_ALLOWED
-        }.getOrDefault(false)
+    /** AppOps-Recht einer fremden App pruefen (z. B. Einblenden, Apps installieren). */
+    fun opAllowed(ctx: Context, ai: ApplicationInfo, op: String): Boolean = runCatching {
+        val ops = ctx.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        val mode = if (Build.VERSION.SDK_INT >= 29) ops.unsafeCheckOpNoThrow(op, ai.uid, ai.packageName)
+        else @Suppress("DEPRECATION") ops.checkOpNoThrow(op, ai.uid, ai.packageName)
+        mode == AppOpsManager.MODE_ALLOWED
+    }.getOrDefault(false)
+
+    private fun signatures(pi: PackageInfo): List<android.content.pm.Signature> = runCatching {
+        if (Build.VERSION.SDK_INT >= 28) {
+            val si = pi.signingInfo ?: return@runCatching emptyList()
+            (if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory).orEmpty().toList()
+        } else @Suppress("DEPRECATION") pi.signatures.orEmpty().toList()
+    }.getOrDefault(emptyList())
+
+    fun certSha256(pi: PackageInfo): List<String> = signatures(pi).map { hex(MessageDigest.getInstance("SHA-256").digest(it.toByteArray())) }
+
+    /** Aussteller-Name aus dem Zertifikat (nur zur Anzeige – laesst sich frei waehlen, daher kein Vertrauensbeweis). */
+    fun certSubject(pi: PackageInfo): String? = runCatching {
+        val sig = signatures(pi).firstOrNull() ?: return null
+        val cert = java.security.cert.CertificateFactory.getInstance("X.509")
+            .generateCertificate(sig.toByteArray().inputStream()) as java.security.cert.X509Certificate
+        val dn = cert.subjectX500Principal.name
+        Regex("""(?:^|,)O=([^,]+)""").find(dn)?.groupValues?.get(1) ?: Regex("""(?:^|,)CN=([^,]+)""").find(dn)?.groupValues?.get(1) ?: dn
+    }.getOrNull()
+
+    /** Identitaets-Index: vorinstallierte Pakete und signaturgepruefte Hersteller je Paket. */
+    class IdentityIndex(val systemPkgs: Set<String>, val vendorOf: Map<String, String>, val certs: Map<String, List<String>>)
+
+    fun identityIndex(pkgs: List<PackageInfo>): IdentityIndex {
+        val certs = pkgs.associate { it.packageName to certSha256(it) }
+        val pre = pkgs.filter { (it.applicationInfo?.flags ?: 0) and ApplicationInfo.FLAG_SYSTEM != 0 }
+        val platform = certs["android"].orEmpty().toSet()
+        val idx = Identity.VendorIndex(pre.associate { it.packageName to certs[it.packageName].orEmpty() }, platform)
+        val vendorOf = pkgs.mapNotNull { p -> idx.verify(p.packageName, certs[p.packageName].orEmpty())?.let { p.packageName to it } }.toMap()
+        return IdentityIndex(pre.map { it.packageName }.toSet(), vendorOf, certs)
     }
 
-    fun certSha1(pi: PackageInfo): List<String> = runCatching {
-        val sigs = if (Build.VERSION.SDK_INT >= 28) {
-            val si = pi.signingInfo ?: return@runCatching emptyList()
-            if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory
-        } else @Suppress("DEPRECATION") pi.signatures
-        sigs.orEmpty().map { hex(MessageDigest.getInstance("SHA-1").digest(it.toByteArray())) }
-    }.getOrDefault(emptyList())
+    fun identityIndex(ctx: Context) = identityIndex(packages(ctx))
+
+    private fun vpnPackages(pm: PackageManager): Set<String> = runCatching {
+        pm.queryIntentServices(Intent("android.net.VpnService"), PackageManager.MATCH_ALL).map { it.serviceInfo.packageName }.toSet()
+    }.getOrNull().orEmpty()
+
+    fun certSha1(pi: PackageInfo): List<String> = signatures(pi).map { hex(MessageDigest.getInstance("SHA-1").digest(it.toByteArray())) }
 
     fun sha256(file: File): String? = runCatching {
         if (!file.canRead() || file.length() > MAX_HASH_BYTES) return null
@@ -110,10 +138,14 @@ object AppInventory {
         val sms = runCatching { Telephony.Sms.getDefaultSmsPackage(ctx) }.getOrNull()
         val home = defaultHome(ctx)
         val launchers = launcherPackages(pm)
+        val vpn = vpnPackages(pm)
+        val id = identityIndex(pkgs)
         return pkgs.mapIndexed { i, pi ->
             onProgress(i + 1, pkgs.size)
             val ai = pi.applicationInfo
             val system = isSystem(ai)
+            val preinstalled = ai != null && (ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            val installer = installerOf(pm, pi.packageName)
             val requested = pi.requestedPermissions.orEmpty()
             val flags = pi.requestedPermissionsFlags
             val granted = requested.filterIndexed { idx, _ ->
@@ -123,7 +155,7 @@ object AppInventory {
                 pkg = pi.packageName,
                 label = ai?.let { runCatching { pm.getApplicationLabel(it).toString() }.getOrNull() } ?: pi.packageName,
                 system = system,
-                installer = installerOf(pm, pi.packageName),
+                installer = installer,
                 firstInstall = pi.firstInstallTime,
                 lastUpdate = pi.lastUpdateTime,
                 versionName = pi.versionName,
@@ -136,7 +168,18 @@ object AppInventory {
                 notificationListener = pi.packageName in listeners,
                 defaultSms = pi.packageName == sms,
                 defaultHome = pi.packageName == home,
-                overlayAllowed = ai != null && !system && overlayAllowed(ctx, ai, "android.permission.SYSTEM_ALERT_WINDOW" in requested),
+                overlayAllowed = ai != null && "android.permission.SYSTEM_ALERT_WINDOW" in requested &&
+                    opAllowed(ctx, ai, "android:system_alert_window"),
+                preinstalled = preinstalled,
+                updatedSystem = ai != null && (ai.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0,
+                vendor = id.vendorOf[pi.packageName],
+                installSource = Identity.installSource(installer, preinstalled, id.systemPkgs, id.vendorOf.keys),
+                requestedPerms = requested.toSet(),
+                certSha256 = id.certs[pi.packageName].orEmpty(),
+                certSubject = certSubject(pi),
+                vpnService = pi.packageName in vpn,
+                canInstallPackages = ai != null && "android.permission.REQUEST_INSTALL_PACKAGES" in requested &&
+                    opAllowed(ctx, ai, "android:request_install_packages"),
             )
         }
     }

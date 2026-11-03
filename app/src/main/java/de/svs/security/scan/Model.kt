@@ -1,11 +1,12 @@
 package de.svs.security.scan
 
-enum class Severity(val label: String, val weight: Int) {
-    CRITICAL("Kritisch", 40),
-    HIGH("Hoch", 20),
-    MEDIUM("Mittel", 8),
-    LOW("Gering", 2),
-    INFO("Hinweis", 0),
+/** [label] fuer Geraete-Befunde, [appLabel] = Risikostufe fuer App-Befunde. */
+enum class Severity(val label: String, val appLabel: String, val weight: Int) {
+    CRITICAL("Kritisch", "Hohes Risiko", 40),
+    HIGH("Hoch", "Verdächtig", 20),
+    MEDIUM("Mittel", "Prüfen", 8),
+    LOW("Gering", "Geringes Risiko", 2),
+    INFO("Hinweis", "Unauffällig", 0),
 }
 
 /** Was der Knopf an einem Befund tun soll. */
@@ -18,7 +19,18 @@ data class Finding(
     val advice: String,
     val pkg: String? = null,
     val action: FixAction = FixAction.NONE,
-)
+    /** Risk Score 0–100 (nur App-Befunde) */
+    val score: Int? = null,
+    /** Steckbrief: Paket, Identität, Quelle, System/User, Sonderrechte … */
+    val facts: List<Pair<String, String>> = emptyList(),
+    /** Was den Score erhöht hat ("+25 Bedienungshilfe aktiv") */
+    val factors: List<String> = emptyList(),
+    /** Warum etwas als unkritisch eingestuft wurde */
+    val neutral: List<String> = emptyList(),
+) {
+    /** Anzeige der Stufe: bei Apps die Risikostufe mit Score */
+    val levelText: String get() = if (score != null) "${severity.appLabel} · $score/100" else severity.label
+}
 
 /** Alles, was die App ueber eine installierte App weiss. */
 data class AppInfo(
@@ -39,6 +51,18 @@ data class AppInfo(
     val defaultSms: Boolean,
     val defaultHome: Boolean,
     val overlayAllowed: Boolean,
+    /** FLAG_SYSTEM: Teil des Geraete-Images (vorinstalliert) */
+    val preinstalled: Boolean = system,
+    /** vorinstallierte App, die per Update aktualisiert wurde */
+    val updatedSystem: Boolean = false,
+    /** signaturgepruefter Hersteller ("Samsung", "Google", "Android") oder null */
+    val vendor: String? = null,
+    val installSource: InstallSource = Identity.installSource(installer, preinstalled, emptySet(), emptySet()),
+    val requestedPerms: Set<String> = grantedPerms,
+    val certSha256: List<String> = emptyList(),
+    val certSubject: String? = null,
+    val vpnService: Boolean = false,
+    val canInstallPackages: Boolean = false,
 )
 
 data class ScanResult(

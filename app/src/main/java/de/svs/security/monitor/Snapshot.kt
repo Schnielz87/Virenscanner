@@ -1,11 +1,12 @@
 package de.svs.security.monitor
 
 import de.svs.security.history.LogEvent
+import de.svs.security.scan.Identity
 import de.svs.security.scan.RiskRules
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class AppEntry(val label: String, val installer: String?, val lastUpdate: Long, val system: Boolean)
+data class AppEntry(val label: String, val installer: String?, val lastUpdate: Long, val system: Boolean, val vendor: String? = null)
 
 /** Momentaufnahme der sicherheitsrelevanten Geraetezustaende – wird stuendlich verglichen. */
 data class Snapshot(
@@ -22,7 +23,7 @@ data class Snapshot(
         put("time", time)
         put("apps", JSONObject().apply {
             apps.forEach { (k, v) ->
-                put(k, JSONObject().put("l", v.label).put("i", v.installer ?: "").put("u", v.lastUpdate).put("s", v.system))
+                put(k, JSONObject().put("l", v.label).put("i", v.installer ?: "").put("u", v.lastUpdate).put("s", v.system).put("v", v.vendor ?: ""))
             }
         })
         put("acc", JSONArray(accessibility.toList()))
@@ -39,7 +40,7 @@ data class Snapshot(
             val a = o.getJSONObject("apps")
             val apps = a.keys().asSequence().associateWith { k ->
                 val e = a.getJSONObject(k)
-                AppEntry(e.getString("l"), e.optString("i").ifEmpty { null }, e.getLong("u"), e.optBoolean("s"))
+                AppEntry(e.getString("l"), e.optString("i").ifEmpty { null }, e.getLong("u"), e.optBoolean("s"), e.optString("v").ifEmpty { null })
             }
             fun set(n: String) = o.optJSONArray(n)?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() }.orEmpty()
             return Snapshot(
@@ -52,13 +53,18 @@ data class Snapshot(
         fun diff(old: Snapshot, new: Snapshot, now: Long = new.time): List<LogEvent> {
             val out = mutableListOf<LogEvent>()
             fun lbl(p: String) = new.apps[p]?.label ?: old.apps[p]?.label ?: p
+            val systemPkgs = new.apps.filterValues { it.system }.keys
+            val vendorPkgs = new.apps.filterValues { it.vendor != null }.keys
 
             for ((p, e) in new.apps) {
                 val before = old.apps[p]
                 if (before == null) {
-                    val unknown = !e.system && e.installer !in RiskRules.TRUSTED_INSTALLERS
+                    val src = Identity.installSource(e.installer, e.system, systemPkgs, vendorPkgs)
+                    val unknown = !e.system && e.vendor == null && !src.trusted
                     out += LogEvent(now, "INSTALL", "Neue App: ${e.label}",
-                        "Quelle: ${RiskRules.installerLabel(e.installer)}" + if (unknown) " – NICHT aus einem offiziellen Store!" else "", p, alert = unknown)
+                        "Quelle: ${RiskRules.installerLabel(e.installer)}" +
+                            if (unknown) " – nicht aus Store, Hersteller oder System" else if (e.vendor != null) " – Herstellerkomponente (${e.vendor}, Signatur bestätigt)" else "",
+                        p, alert = unknown)
                 }
             }
             for ((p, e) in old.apps) if (p !in new.apps) {

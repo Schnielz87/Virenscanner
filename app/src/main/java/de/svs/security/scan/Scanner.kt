@@ -107,17 +107,12 @@ object Scanner {
                 val ai = pi.applicationInfo ?: return@filter false
                 !AppInventory.isSystem(ai) && pi.packageName != ctx.packageName &&
                     pi.requestedPermissions.orEmpty().contains("android.permission.REQUEST_INSTALL_PACKAGES") &&
-                    runCatching {
-                        val ops = ctx.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
-                        val mode = if (Build.VERSION.SDK_INT >= 29) ops.unsafeCheckOpNoThrow("android:request_install_packages", ai.uid, ai.packageName)
-                        else @Suppress("DEPRECATION") ops.checkOpNoThrow("android:request_install_packages", ai.uid, ai.packageName)
-                        mode == android.app.AppOpsManager.MODE_ALLOWED
-                    }.getOrDefault(false)
+                    AppInventory.opAllowed(ctx, ai, "android:request_install_packages")
             }.map { runCatching { pm.getApplicationLabel(it.applicationInfo!!).toString() }.getOrDefault(it.packageName) }
         }.getOrDefault(emptyList())
         if (installers.isNotEmpty()) out += Finding(
             Severity.LOW, "Apps dürfen andere Apps installieren",
-            "Folgende Apps dürfen „unbekannte Apps installieren“: ${installers.joinToString(", ")}. Besonders bei Browsern ist das ein Einfallstor für Trojaner.",
+            "Folgende Apps dürfen „unbekannte Apps installieren“: ${installers.joinToString(", ")}. Besonders bei Browsern ist das ein häufiger Weg für Schad-Apps.",
             "Einstellungen → Apps → ⋮ → Spezieller Zugriff → Unbekannte Apps installieren: nur erlauben, wenn nötig.",
             action = FixAction.APP_SETTINGS,
         )
@@ -133,11 +128,16 @@ object Scanner {
             .put("findings", JSONArray().apply {
                 r.findings.forEach {
                     put(JSONObject().put("sev", it.severity.name).put("title", it.title).put("detail", it.detail)
-                        .put("advice", it.advice).put("pkg", it.pkg ?: "").put("action", it.action.name))
+                        .put("advice", it.advice).put("pkg", it.pkg ?: "").put("action", it.action.name)
+                        .put("score", it.score ?: -1)
+                        .put("facts", JSONArray(it.facts.map { (k, v) -> JSONArray(listOf(k, v)) }))
+                        .put("factors", JSONArray(it.factors)).put("neutral", JSONArray(it.neutral)))
                 }
             })
         file(ctx).writeText(o.toString())
     }
+
+    private fun strings(a: JSONArray?) = a?.let { (0 until it.length()).map { i -> it.getString(i) } }.orEmpty()
 
     fun last(ctx: Context): ScanResult? = runCatching {
         val o = JSONObject(file(ctx).readText())
@@ -147,6 +147,10 @@ object Scanner {
             Finding(
                 Severity.valueOf(f.getString("sev")), f.getString("title"), f.getString("detail"), f.getString("advice"),
                 f.getString("pkg").ifEmpty { null }, runCatching { FixAction.valueOf(f.getString("action")) }.getOrDefault(FixAction.NONE),
+                score = f.optInt("score", -1).takeIf { it >= 0 },
+                facts = f.optJSONArray("facts")?.let { a -> (0 until a.length()).map { a.getJSONArray(it).let { p -> p.getString(0) to p.getString(1) } } }.orEmpty(),
+                factors = strings(f.optJSONArray("factors")),
+                neutral = strings(f.optJSONArray("neutral")),
             )
         })
     }.getOrNull()

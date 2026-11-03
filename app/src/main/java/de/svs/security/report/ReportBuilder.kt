@@ -36,6 +36,11 @@ object ReportBuilder {
                 ctx.packageManager.getApplicationInfo(a.pkg, 0).sourceDir?.let { AppInventory.sha256(java.io.File(it)) }
             }.getOrNull()) else a
         }
+        val cleared = withHash.filter { !it.hasLauncher && !it.preinstalled }
+            .map { RiskRules.assess(it, ThreatIntel.db, now) }
+            .filter { it.score < de.svs.security.scan.RiskConfig.SHOW_FROM }
+            .sortedBy { it.app.label.lowercase() }
+            .map { a -> "${a.app.label} (${a.app.pkg}) – Score ${a.score} – ${a.identity} – ${a.neutral.firstOrNull { n -> n.startsWith("Kein App-Symbol") } ?: "kein App-Symbol, keine kritischen Sonderrechte"}" }
         val events = runCatching { Timeline.build(ctx, now - EVENT_DAYS * 86_400_000L, now) }.getOrDefault(emptyList())
         val st = ThreatIntel.status.value
         ReportFormatter.format(
@@ -50,6 +55,7 @@ object ReportBuilder {
                 apps = withHash,
                 events = events,
                 eventDays = EVENT_DAYS,
+                cleared = cleared,
                 intel = listOf(
                     "Zuletzt aktualisiert" to fmt(st.lastUpdate),
                     "Spionage-App-Familien" to "${st.families}",
