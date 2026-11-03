@@ -33,3 +33,6 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Fester Signaturschluessel fuer Sideload-Updates (bewusst im Repo)
+!app/signing/sideload.jks

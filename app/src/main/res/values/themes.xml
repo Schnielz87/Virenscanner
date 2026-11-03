@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.SvsSecurity" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#A5231F</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
