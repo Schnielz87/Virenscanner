@@ -17,6 +17,7 @@ Zahlung von 610 € gefordert) und danach verschwundenen Widgets.
 | **Verlauf** (b) | Rückwirkende Chronik: welche App wann aktiv war, Entsperren, Neustarts/Ausschalten (Android-Nutzungsstatistik, ca. 7–10 Tage), Installationen und Updates aller Apps mit Quelle (unbegrenzt), dazu das eigene Protokoll (Daten gelöscht, Deinstallationen, abgesicherter Modus, neue Rechte, blockierte Seiten). Zusammenfassung je Zeitraum. |
 | **Schutz** (c) | Web-Schutz: lokales DNS-VPN blockiert Malware-/Phishing-/Spionage-Domains, bevor der Browser sie lädt. Überwachung im Hintergrund mit Warnungen. Link-Prüfung (auch über „Teilen“). Empfehlungen (Privates DNS, Samsung Internet, Startbildschirm-Backup). |
 | **Daten** | Täglich aktualisierte Bedrohungsdaten mit Stand und Umfang, BSI-Warnungen (filterbar auf Handy-relevante Meldungen). |
+| **Diagnose** | Bewertet ALLE installierten Apps (auch unauffällige): Score, Faktoren, „unkritisch, weil …“, Herkunft, Hersteller-Signatur, Sonderrechte und **Entfernen-Risiko** (Systemkritisch / In Benutzung / Systemkomponente / Herstellerkomponente / Nutzer-App). Filter (Treffer, Ohne Symbol, Hersteller, Unbekannte Quelle, Nicht entfernen). Export als JSON (`Handywaechter-Diagnose_….json`) zum Speichern, Teilen oder Kopieren – zur Auswertung von Fehlalarmen. |
 | **Hilfe** | Erklärung der Betrugsmasche, Vorgehen (Anzeige, Bank), Ursachen und Wiederherstellung verschwundener Widgets, Grenzen der App, **Update**. |
 
 ### Warnungen (Benachrichtigungen)

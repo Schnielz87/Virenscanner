@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Public
@@ -27,10 +28,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import de.svs.security.ui.AppViewModel
 import de.svs.security.ui.DataScreen
+import de.svs.security.ui.DiagnoseScreen
 import de.svs.security.ui.HelpScreen
 import de.svs.security.ui.HistoryScreen
 import de.svs.security.ui.ProtectScreen
@@ -45,6 +48,7 @@ enum class Tab(val key: String, val label: String, val icon: ImageVector) {
     HISTORY("history", "Verlauf", Icons.Filled.History),
     PROTECT("protect", "Schutz", Icons.Filled.Shield),
     DATA("data", "Daten", Icons.Filled.Public),
+    DIAG("diag", "Diagnose", Icons.Filled.BugReport),
     HELP("help", "Hilfe", Icons.Filled.Help),
 }
 
@@ -59,6 +63,16 @@ class MainActivity : ComponentActivity() {
         val ok = runCatching { contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) } != null }.getOrDefault(false)
         android.widget.Toast.makeText(this, if (ok) "Bericht gespeichert" else "Speichern fehlgeschlagen", android.widget.Toast.LENGTH_SHORT).show()
     }
+
+    private val saveDiag = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val text = vm.diagJson() ?: return@registerForActivityResult
+        if (uri == null) return@registerForActivityResult
+        val ok = runCatching { contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) } != null }.getOrDefault(false)
+        android.widget.Toast.makeText(this, if (ok) "Diagnose gespeichert" else "Speichern fehlgeschlagen", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun saveDiagFile() = saveDiag.launch("Handywaechter-Diagnose_" +
+        java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.GERMANY).format(java.util.Date()) + ".json")
 
     private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val vpnConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -109,7 +123,7 @@ class MainActivity : ComponentActivity() {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab.value == t, onClick = { tab.value = t },
-                            icon = { Icon(t.icon, null) }, label = { Text(t.label) },
+                            icon = { Icon(t.icon, null) }, label = { Text(t.label, maxLines = 1, softWrap = false, fontSize = 10.sp) },
                         )
                     }
                 }
@@ -122,6 +136,7 @@ class MainActivity : ComponentActivity() {
                 Tab.HISTORY -> HistoryScreen(vm, m)
                 Tab.PROTECT -> ProtectScreen(vm, m, sharedText.value, ::enableShield) { sharedText.value = null }
                 Tab.DATA -> DataScreen(vm, m)
+                Tab.DIAG -> DiagnoseScreen(vm, m, ::saveDiagFile)
                 Tab.HELP -> HelpScreen(vm, m)
             }
         }

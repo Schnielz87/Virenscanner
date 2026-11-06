@@ -8,6 +8,8 @@ import de.svs.security.history.Timeline
 import de.svs.security.intel.ThreatDb
 import de.svs.security.intel.ThreatIntel
 import de.svs.security.monitor.Monitor
+import de.svs.security.diag.DiagBuilder
+import de.svs.security.diag.Diagnostics
 import de.svs.security.report.ReportBuilder
 import de.svs.security.scan.ScanResult
 import de.svs.security.scan.ScanWorker
@@ -39,6 +41,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val updateBusy = MutableStateFlow(false)
 
     val linkResult = MutableStateFlow<Pair<String, String?>?>(null)
+
+    /** Diagnose aller Apps */
+    val diag = MutableStateFlow<DiagBuilder.Result?>(null)
+    /** Fortschrittstext, null = nicht beschaeftigt */
+    val diagBusy = MutableStateFlow<String?>(null)
+    private var diagJsonCache: String? = null
+
+    fun buildDiag() {
+        if (diagBusy.value != null) return
+        viewModelScope.launch {
+            diagBusy.value = "Starte …"
+            val r = runCatching { DiagBuilder.build(ctx) { diagBusy.value = it } }.getOrNull()
+            diagJsonCache = null
+            if (r != null) diag.value = r
+            diagBusy.value = null
+        }
+    }
+
+    /** Export als JSON (wird beim ersten Aufruf erzeugt). */
+    fun diagJson(): String? {
+        val d = diag.value ?: return null
+        return diagJsonCache ?: Diagnostics.toJson(d.meta, d.entries).also { diagJsonCache = it }
+    }
 
     /** Gesamtuebersicht (Text) – null = nicht geoeffnet */
     val report = MutableStateFlow<String?>(null)
