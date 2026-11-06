@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -60,6 +61,10 @@ fun HistoryScreen(vm: AppViewModel, modifier: Modifier) {
                 Body("Damit die App rückwirkend zeigen kann, welche App wann geöffnet wurde, wann das Handy neu gestartet und entsperrt wurde, braucht sie den „Nutzungsdatenzugriff“. Android speichert diese Daten ca. 7–10 Tage – gestern Abend ist also noch sichtbar.")
                 Button(onClick = { Actions.usageAccess(ctx) }) { Text("Zugriff erlauben") }
                 Muted("In der Liste „Handywächter“ antippen und einschalten, dann zurückkehren.")
+                Body("Schalter grau / „Gesteuert durch eingeschränkte Einstellung“? Android sperrt das bei Apps, die nicht aus dem Play Store kommen. So gibst du es einmalig frei:")
+                Body("1. „App-Info öffnen“ tippen\n2. oben rechts ⋮ (drei Punkte) → „Eingeschränkte Einstellungen zulassen“ → mit PIN/Fingerabdruck bestätigen\n3. Zurück und erneut „Zugriff erlauben“ tippen – jetzt lässt sich der Schalter einschalten")
+                OutlinedButton(onClick = { Actions.appSettings(ctx, ctx.packageName) }) { Text("App-Info öffnen") }
+                Muted("Taucht der Punkt unter ⋮ nicht auf: zuerst einmal versuchen, den grauen Schalter einzuschalten (die Meldung „Zugriff verweigert“ schließen), dann erscheint er.")
             }
         }
         item {
